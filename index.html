@@ -233,8 +233,8 @@
                 let jumpCount = 0;
                 let jumpInterval = setInterval(() => {
                     // Zıplama yüksekliği
-                    if (jumpCount < 15) {
-                        jumpHeight += jumpForce * (1 - jumpCount/15);
+                    if (jumpCount < 21) {
+                        jumpHeight += jumpForce * (1 - jumpCount/21);
                         civciv.style.bottom = (150 + jumpHeight) + 'px';
                     } else {
                         // Yerçekimi etkisi
