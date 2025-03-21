@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Civciv Koşu Oyunu</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #87CEEB;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #civciv {
+            position: absolute;
+            bottom: 150px;
+            left: 50px;
+            width: 50px;
+            height: 50px;
+            background-color: #FFFF00;
+            border-radius: 50% 50% 50% 50%;
+            z-index: 10;
+        }
+        /* Civciv tasarımını sağa bakan şekilde güncelleme */
+        #civciv::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            right: -15px;  /* Sağa bakan gaga */
+            width: 20px;
+            height: 15px;
+            background-color: #FF6347;
+            border-radius: 0 50% 50% 0;
+        }
+        #civciv::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            right: -5px;  /* Sağa bakan göz */
+            width: 5px;
+            height: 5px;
+            background-color: #000;
+            border-radius: 50%;
+        }
+        /* Civciv ayakları */
+        .ayak {
+            position: absolute;
+            width: 10px;
+            height: 15px;
+            background-color: #FF6347;
+            bottom: -15px;
+        }
+        .ayak.sol {
+            left: 10px;
+            border-radius: 0 0 5px 5px;
+        }
+        .ayak.sag {
+            left: 30px;
+            border-radius: 0 0 5px 5px;
+        }
+        /* Meyvelerin görünümünü daha belirgin hale getirme */
+        .obstacle {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            bottom: 150px;
+            z-index: 8;
+        }
+        .uzum {
+            background-color: #800080;
+            border-radius: 50%;
+            border: 2px solid #4B0082;
+        }
+        .uzum::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 10px;
+            background-color: #006400;
+        }
+        .cilek {
+            background-color: #FF0000;
+            border-radius: 45% 45% 45% 45%;
+            border: 2px solid #8B0000;
+        }
+        .cilek::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 15px;
+            height: 10px;
+            background-color: #006400;
+            border-radius: 50% 50% 0 0;
+        }
+        .cilek::after {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background-color: #FFFF00;
+            border-radius: 50%;
+            top: 10px;
+            left: 10px;
+            box-shadow: 
+                10px 5px 0 #FFFF00,
+                15px 12px 0 #FFFF00,
+                5px 20px 0 #FFFF00,
+                20px 7px 0 #FFFF00;
+        }
+        #deniz {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 150px;
+            background-color: #1E90FF;
+            z-index: 5;
+        }
+        #score {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            color: #000;
+            z-index: 15;
+            background-color: rgba(255, 255, 255, 0.5);
+            padding: 5px 10px;
+            border-radius: 10px;
+        }
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #FF0000;
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            z-index: 100;
+        }
+        #restart-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .wave {
+            position: absolute;
+            bottom: 150px;
+            width: 100%;
+            height: 15px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 100% 100% 0 0;
+            animation: wave 2s infinite linear;
+        }
+        @keyframes wave {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+        /* Zıplama animasyonu */
+        @keyframes run {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+            100% { transform: translateY(0); }
+        }
+        #civciv.running {
+            animation: run 0.3s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="civciv">
+            <div class="ayak sol"></div>
+            <div class="ayak sag"></div>
+        </div>
+        <div id="deniz"></div>
+        <div class="wave" style="animation-delay: 0s;"></div>
+        <div class="wave" style="animation-delay: 0.5s; bottom: 140px;"></div>
+        <div id="score">Skor: 0</div>
+        <div id="game-over">
+            <div id="game-over-text"></div>
+            <button id="restart-btn">Tekrar Oyna</button>
+        </div>
+    </div>
+
+    <script>
+        // Oyun değişkenleri
+        let isJumping = false;
+        let isGameOver = false;
+        let score = 0;
+        let speed = 5;
+        let gravity = 0.9;
+        let jumpForce = 15;
+        let civcivPosition = 50;
+        let jumpHeight = 0;
+        let obstacleInterval;
+        let currentObstacle = null;
+        
+        // DOM elementlerini al
+        const civciv = document.getElementById('civciv');
+        const gameContainer = document.getElementById('game-container');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('game-over');
+        const gameOverText = document.getElementById('game-over-text');
+        const restartBtn = document.getElementById('restart-btn');
+        
+        // Civciv koşma animasyonu
+        civciv.classList.add('running');
+        
+        // Civciv zıplama kontrolü
+        function jump() {
+            if (!isJumping && !isGameOver) {
+                isJumping = true;
+                civciv.classList.remove('running');
+                let jumpCount = 0;
+                let jumpInterval = setInterval(() => {
+                    // Zıplama yüksekliği
+                    if (jumpCount < 15) {
+                        jumpHeight += jumpForce * (1 - jumpCount/15);
+                        civciv.style.bottom = (150 + jumpHeight) + 'px';
+                    } else {
+                        // Yerçekimi etkisi
+                        jumpHeight -= gravity * (jumpCount - 14);
+                        if (jumpHeight < 0) {
+                            jumpHeight = 0;
+                            isJumping = false;
+                            civciv.classList.add('running');
+                            clearInterval(jumpInterval);
+                        }
+                        civciv.style.bottom = (150 + jumpHeight) + 'px';
+                    }
+                    jumpCount++;
+                }, 20);
+            }
+        }
+        
+        // Engel oluşturma - teker teker gelecek şekilde
+        function createObstacle() {
+            if (!isGameOver && !currentObstacle) {
+                const obstacle = document.createElement('div');
+                obstacle.classList.add('obstacle');
+                
+                // Rastgele engel türü (üzüm veya çilek)
+                if (Math.random() > 0.5) {
+                    obstacle.classList.add('uzum');
+                    obstacle.dataset.type = 'uzum';
+                } else {
+                    obstacle.classList.add('cilek');
+                    obstacle.dataset.type = 'cilek';
+                }
+                
+                // Engelin başlangıç pozisyonu - ekranın dışından başlat
+                obstacle.style.left = '100%';
+                gameContainer.appendChild(obstacle);
+                
+                console.log("Meyve oluşturuldu: " + obstacle.dataset.type);
+                
+                // Mevcut engeli ayarla
+                currentObstacle = obstacle;
+                
+                // Engeli hareket ettir
+                moveObstacle(obstacle);
+            }
+        }
+        
+        // Engeli hareket ettirme
+        function moveObstacle(obstacle) {
+            let obstaclePosition = 100;
+            let moveInterval = setInterval(() => {
+                if (isGameOver) {
+                    clearInterval(moveInterval);
+                    return;
+                }
+                
+                // Engeli sola doğru hareket ettir
+                obstaclePosition -= speed / 10;
+                obstacle.style.left = obstaclePosition + '%';
+                
+                // Çarpışma kontrolü - civciv ve meyve arasındaki mesafeyi kontrol et
+                const civcivRect = civciv.getBoundingClientRect();
+                const obstacleRect = obstacle.getBoundingClientRect();
+                
+                if (
+                    civcivRect.right > obstacleRect.left &&
+                    civcivRect.left < obstacleRect.right &&
+                    civcivRect.bottom > obstacleRect.top &&
+                    civcivRect.top < obstacleRect.bottom
+                ) {
+                    // Oyun sonu
+                    if (obstacle.dataset.type === 'uzum') {
+                        gameOver("Übez piç yüzünden kaybettik!");
+                    } else {
+                        gameOver("Sedeh yüzünden kaybettik!");
+                    }
+                    clearInterval(moveInterval);
+                }
+                
+                // Engel ekrandan çıktığında
+                if (obstaclePosition < -10) {
+                    clearInterval(moveInterval);
+                    obstacle.remove(); // Daha temiz bir yöntem
+                    currentObstacle = null; // Yeni engel için hazır
+                    score++;
+                    scoreElement.textContent = "Skor: " + score;
+                    
+                    // Hız artışı
+                    if (score % 5 === 0) {
+                        speed += 0.5;
+                    }
+                }
+            }, 20);
+        }
+        
+        // Oyun bittiğinde
+        function gameOver(message) {
+            isGameOver = true;
+            clearInterval(obstacleInterval);
+            civciv.classList.remove('running');
+            gameOverText.textContent = message;
+            gameOverElement.style.display = 'block';
+        }
+        
+        // Oyunu yeniden başlat
+        function restartGame() {
+            // Tüm engelleri temizle
+            const obstacles = document.querySelectorAll('.obstacle');
+            obstacles.forEach(obstacle => {
+                obstacle.remove();
+            });
+            
+            // Değişkenleri sıfırla
+            isGameOver = false;
+            isJumping = false;
+            score = 0;
+            speed = 5;
+            jumpHeight = 0;
+            currentObstacle = null;
+            
+            // UI'ı sıfırla
+            civciv.style.bottom = '150px';
+            civciv.classList.add('running');
+            scoreElement.textContent = "Skor: 0";
+            gameOverElement.style.display = 'none';
+            
+            // Engel oluşturmayı başlat
+            startObstacleGeneration();
+        }
+        
+        // Engel oluşturma zamanlayıcısını başlat
+        function startObstacleGeneration() {
+            // İlk meyveyi oluştur
+            setTimeout(checkAndCreateObstacle, 1000);
+        }
+        
+        // Mevcut engel yoksa yeni engel oluştur
+        function checkAndCreateObstacle() {
+            if (!isGameOver) {
+                if (!currentObstacle) {
+                    // Yeni bir meyve oluştur
+                    createObstacle();
+                }
+                
+                // Tekrar kontrol et
+                setTimeout(checkAndCreateObstacle, 1000);
+            }
+        }
+        
+        // Klavye kontrolü
+        document.addEventListener('keydown', event => {
+            if (event.code === 'Space') {
+                event.preventDefault();
+                jump();
+            }
+        });
+        
+        // Dokunmatik ekran kontrolü
+        document.addEventListener('touchstart', event => {
+            event.preventDefault();
+            jump();
+        });
+        
+        // Tıklama kontrolü
+        document.addEventListener('click', event => {
+            jump();
+        });
+        
+        // Restart butonuna tıklama
+        restartBtn.addEventListener('click', restartGame);
+        
+        // Konsola bilgi
+        console.log("Oyun başlatılıyor...");
+        
+        // Oyunu başlat
+        startObstacleGeneration();
+    </script>
+</body>
+</html>
